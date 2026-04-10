@@ -1,10 +1,10 @@
-# 🐒 MonkeyPatching — Security Resources
+# 🐒 NetNuggets — Security Resources
 
 A curated collection of cybersecurity threat reports, developer-focused analysis, and infosec reading material.
 
-This repo is a companion to the **MonkeyPatching** YouTube channel and Medium publication — where we break down complex security and engineering topics for developers.
+This repo is a companion to the **NetNuggets**  Medium publication — where we break down complex security and engineering topics for developers.
 
-- 📺 YouTube: [MonkeyPatching](https://youtube.com/@MonkeyPatching)
+
 - ✍️ Medium: [NetNuggets](https://medium.com/@netnuggets)
 
 ---
