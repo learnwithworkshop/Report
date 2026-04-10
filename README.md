@@ -5,7 +5,7 @@ A curated collection of cybersecurity threat reports, developer-focused analysis
 This repo is a companion to the **MonkeyPatching** YouTube channel and Medium publication — where we break down complex security and engineering topics for developers.
 
 - 📺 YouTube: [MonkeyPatching](https://youtube.com/@MonkeyPatching)
-- ✍️ Medium: [https://medium.com/](https://medium.com/@netnuggets)
+- ✍️ Medium: [NetNuggets](https://medium.com/@netnuggets)
 
 ---
 
