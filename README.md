@@ -17,6 +17,7 @@ Original PDF reports from cybersecurity researchers and firms.
 |                                                      Report                                       |    Publisher     | Year |
 |---------------------------------------------------------------------------------------------------|------------------|------|
 | [Blackpoint Cyber Annual Threat Report](./reports/2026-Annual-Threat-Report-Blackpoint-Cyber.pdf) | Blackpoint Cyber | 2026 |
+|[Wiz Cloud Threats Retrospective 2026](./reports/Cloud Threats Retrospective 2026.pdf).            |  Wiz             | 2026 |
 
 ### Articles & Analysis
 Developer-focused breakdowns of the reports above.
